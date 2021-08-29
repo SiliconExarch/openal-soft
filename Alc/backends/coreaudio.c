@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <AudioUnit/AudioUnit.h>
 #include <AudioToolbox/AudioToolbox.h>
+#include <Availability.h>
 
 #include "backends/base.h"
 
@@ -75,7 +76,11 @@ static void ALCcoreAudioPlayback_Construct(ALCcoreAudioPlayback *self, ALCdevice
 static void ALCcoreAudioPlayback_Destruct(ALCcoreAudioPlayback *self)
 {
     AudioUnitUninitialize(self->audioUnit);
+#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
     AudioComponentInstanceDispose(self->audioUnit);
+#else
+    CloseComponent(self->audioUnit);
+#endif
 
     ALCbackend_Destruct(STATIC_CAST(ALCbackend, self));
 }
@@ -100,8 +105,13 @@ static OSStatus ALCcoreAudioPlayback_MixerProc(void *inRefCon,
 static ALCenum ALCcoreAudioPlayback_open(ALCcoreAudioPlayback *self, const ALCchar *name)
 {
     ALCdevice *device = STATIC_CAST(ALCbackend,self)->mDevice;
+#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
     AudioComponentDescription desc;
     AudioComponent comp;
+#else
+    ComponentDescription desc;
+    Component comp;
+#endif
     OSStatus err;
 
     if(!name)
@@ -120,14 +130,22 @@ static ALCenum ALCcoreAudioPlayback_open(ALCcoreAudioPlayback *self, const ALCch
     desc.componentFlags = 0;
     desc.componentFlagsMask = 0;
 
+#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
     comp = AudioComponentFindNext(NULL, &desc);
+#else
+    comp = FindNextComponent(NULL, &desc);
+#endif
     if(comp == NULL)
     {
         ERR("AudioComponentFindNext failed\n");
         return ALC_INVALID_VALUE;
     }
 
+#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
     err = AudioComponentInstanceNew(comp, &self->audioUnit);
+#else
+    err = OpenAComponent(comp, &self->audioUnit);
+#endif
     if(err != noErr)
     {
         ERR("AudioComponentInstanceNew failed\n");
@@ -139,7 +157,11 @@ static ALCenum ALCcoreAudioPlayback_open(ALCcoreAudioPlayback *self, const ALCch
     if(err != noErr)
     {
         ERR("AudioUnitInitialize failed\n");
+#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
         AudioComponentInstanceDispose(self->audioUnit);
+#else
+        CloseComponent(self->audioUnit);
+#endif
         return ALC_INVALID_VALUE;
     }
 
@@ -397,7 +419,11 @@ static void ALCcoreAudioCapture_Destruct(ALCcoreAudioCapture *self)
     self->audioConverter = NULL;
 
     if(self->audioUnit)
+#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
         AudioComponentInstanceDispose(self->audioUnit);
+#else
+        CloseComponent(self->audioUnit);
+#endif
     self->audioUnit = 0;
 
     ALCbackend_Destruct(STATIC_CAST(ALCbackend, self));
@@ -453,12 +479,20 @@ static ALCenum ALCcoreAudioCapture_open(ALCcoreAudioCapture *self, const ALCchar
     AudioStreamBasicDescription hardwareFormat;   // The hardware format
     AudioStreamBasicDescription outputFormat;     // The AudioUnit output format
     AURenderCallbackStruct input;
+#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
     AudioComponentDescription desc;
+#else
+    ComponentDescription desc;
+#endif
     UInt32 outputFrameCount;
     UInt32 propertySize;
     AudioObjectPropertyAddress propertyAddress;
     UInt32 enableIO;
+#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
     AudioComponent comp;
+#else
+    Component comp;
+#endif
     OSStatus err;
 
     if(!name)
@@ -477,7 +511,11 @@ static ALCenum ALCcoreAudioCapture_open(ALCcoreAudioCapture *self, const ALCchar
     desc.componentFlagsMask = 0;
 
     // Search for component with given description
+#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
     comp = AudioComponentFindNext(NULL, &desc);
+#else
+    comp = FindNextComponent(NULL, &desc);
+#endif
     if(comp == NULL)
     {
         ERR("AudioComponentFindNext failed\n");
@@ -485,7 +523,11 @@ static ALCenum ALCcoreAudioCapture_open(ALCcoreAudioCapture *self, const ALCchar
     }
 
     // Open the component
+#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
     err = AudioComponentInstanceNew(comp, &self->audioUnit);
+#else
+    err = OpenAComponent(comp, &self->audioUnit);
+#endif
     if(err != noErr)
     {
         ERR("AudioComponentInstanceNew failed\n");
@@ -688,7 +730,11 @@ error:
         AudioConverterDispose(self->audioConverter);
     self->audioConverter = NULL;
     if(self->audioUnit)
+#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
         AudioComponentInstanceDispose(self->audioUnit);
+#else
+        CloseComponent(self->audioUnit);
+#endif
     self->audioUnit = 0;
 
     return ALC_INVALID_VALUE;
